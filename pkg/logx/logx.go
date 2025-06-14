@@ -46,3 +46,4 @@ func Error(format string, args ...interface{}) { logf(LOG_ERROR, "ERROR", format
 func Warn(format string, args ...interface{})  { logf(LOG_WARN, "WARN", format, args...) }
 func Info(format string, args ...interface{})  { logf(LOG_INFO, "INFO", format, args...) }
 func Debug(format string, args ...interface{}) { logf(LOG_DEBUG, "DEBUG", format, args...) }
+func Fatal(format string, args ...interface{}) { log.Fatalf(format, args...) }
