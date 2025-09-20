@@ -14,6 +14,7 @@ import (
 type SessionMiddlewareConfig struct {
     Store                Store
     CookieName           string
+    Secure               bool
     SessionDuration      time.Duration
     RegenerateAfter      time.Duration
 }
@@ -24,7 +25,7 @@ func NewSessionMiddleware(config SessionMiddlewareConfig) fiber.Handler {
     return func(c *fiber.Ctx) error {
         ctx := context.Background()
 
-        sessionID, isNew, err := GetOrCreateSessionID(c, config.CookieName, config.SessionDuration)
+        sessionID, isNew, err := GetOrCreateSessionID(c, config.CookieName, config.Secure, config.SessionDuration)
         if err != nil {
             return fiber.ErrInternalServerError
         }
@@ -68,7 +69,7 @@ func NewSessionMiddleware(config SessionMiddlewareConfig) fiber.Handler {
 }
 
 // GetOrCreateSessionID checks if a session ID cookie exists, otherwise creates one
-func GetOrCreateSessionID(c *fiber.Ctx, cookieName string, sessionDuration time.Duration) (sessionID string, isNew bool, err error) {
+func GetOrCreateSessionID(c *fiber.Ctx, cookieName string, secure bool, sessionDuration time.Duration) (sessionID string, isNew bool, err error) {
     cookie := c.Cookies(cookieName)
     if cookie != "" {
         return cookie, false, nil
@@ -85,7 +86,7 @@ func GetOrCreateSessionID(c *fiber.Ctx, cookieName string, sessionDuration time.
         Name:     cookieName,
         Value:    sessionID,
         HTTPOnly: true,
-        Secure:   true,
+        Secure:   secure,
         SameSite: "Lax",
         Path:     "/",
         Expires:  time.Now().Add(sessionDuration),
@@ -137,7 +138,7 @@ func rotateSessionID(ctx context.Context, c *fiber.Ctx, config SessionMiddleware
         Name:     config.CookieName,
         Value:    newSessionID,
         HTTPOnly: true,
-        Secure:   true,
+        Secure:   config.Secure,
         SameSite: "Lax",
         Path:     "/",
         Expires:  time.Now().Add(config.SessionDuration),
