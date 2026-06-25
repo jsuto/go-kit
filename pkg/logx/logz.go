@@ -25,6 +25,7 @@ var (
 )
 
 const requestIDKey = "requestid"
+const componentKey = "component"
 
 func SetLogLevel(logLevel, logFormat string) {
     levelStr := strings.ToUpper(logLevel)
@@ -65,6 +66,20 @@ func GetRequestID(ctx context.Context) string {
     return ""
 }
 
+func WithComponent(ctx context.Context, component string) context.Context {
+    return context.WithValue(ctx, componentKey, component)
+}
+
+func GetComponent(ctx context.Context) string {
+    if ctx == nil {
+        return ""
+    }
+    if c, ok := ctx.Value(componentKey).(string); ok {
+        return c
+    }
+    return ""
+}
+
 // logf is for free-form messages
 func logf(ctx context.Context, level int, prefix string, format string, args ...interface{}) {
     if level > currentLevel {
@@ -72,10 +87,15 @@ func logf(ctx context.Context, level int, prefix string, format string, args ...
     }
 
     reqID := GetRequestID(ctx)
+    component := GetComponent(ctx)
     msg := fmt.Sprintf(format, args...)
 
     if jsonMode {
-        e := zl.With().Str("req", reqID).Logger()
+        w := zl.With().Str("req", reqID)
+        if component != "" {
+            w = w.Str("component", component)
+        }
+        e := w.Logger()
         switch level {
         case LOG_ERROR:
             e.Error().Msg(msg)
@@ -88,7 +108,11 @@ func logf(ctx context.Context, level int, prefix string, format string, args ...
         }
     } else {
         timestamp := time.Now().Format("2006/01/02 15:04:05")
-        log.Printf("[%s] [req:%s] [%s] %s\n", timestamp, reqID, prefix, msg)
+        if component != "" {
+            log.Printf("[%s] [req:%s] [%s] [%s] %s\n", timestamp, reqID, component, prefix, msg)
+        } else {
+            log.Printf("[%s] [req:%s] [%s] %s\n", timestamp, reqID, prefix, msg)
+        }
     }
 }
 
@@ -105,11 +129,14 @@ func StructuredRequestLog(ctx context.Context, method, path, clientIP string, st
     }
 
     reqID := GetRequestID(ctx)
+    component := GetComponent(ctx)
 
     if jsonMode {
-        zl.Info().
-            Str("req", reqID).
-            Str("method", method).
+        e := zl.Info().Str("req", reqID)
+        if component != "" {
+            e = e.Str("component", component)
+        }
+        e.Str("method", method).
             Str("path", path).
             Str("client_ip", clientIP).
             Int("status", status).
@@ -127,11 +154,14 @@ func StructuredErrorLog(ctx context.Context, method, path, clientIP string, stat
     }
 
     reqID := GetRequestID(ctx)
+    component := GetComponent(ctx)
 
     if jsonMode {
-        zl.Error().
-            Str("req", reqID).
-            Str("method", method).
+        e := zl.Error().Str("req", reqID)
+        if component != "" {
+            e = e.Str("component", component)
+        }
+        e.Str("method", method).
             Str("path", path).
             Str("client_ip", clientIP).
             Int("status", status).
