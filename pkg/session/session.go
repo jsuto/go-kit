@@ -12,11 +12,12 @@ import (
 
 // SessionMiddlewareConfig defines the config for the session middleware
 type SessionMiddlewareConfig struct {
-    Store                Store
-    CookieName           string
-    Secure               bool
-    SessionDuration      time.Duration
-    RegenerateAfter      time.Duration
+    Store           Store
+    CookieName      string
+    Secure          bool
+    SameSite        string // defaults to "Lax"; use "None" when Piler is embedded in a cross-origin iframe
+    SessionDuration time.Duration
+    RegenerateAfter time.Duration
 }
 
 // NewSessionMiddleware returns a Fiber middleware that handles
@@ -25,7 +26,11 @@ func NewSessionMiddleware(config SessionMiddlewareConfig) fiber.Handler {
     return func(c *fiber.Ctx) error {
         ctx := context.Background()
 
-        sessionID, isNew, err := GetOrCreateSessionID(c, config.CookieName, config.Secure, config.SessionDuration)
+        if config.SameSite == "" {
+            config.SameSite = "Lax"
+        }
+
+        sessionID, isNew, err := GetOrCreateSessionID(c, config.CookieName, config.Secure, config.SameSite, config.SessionDuration)
         if err != nil {
             return fiber.ErrInternalServerError
         }
@@ -69,7 +74,7 @@ func NewSessionMiddleware(config SessionMiddlewareConfig) fiber.Handler {
 }
 
 // GetOrCreateSessionID checks if a session ID cookie exists, otherwise creates one
-func GetOrCreateSessionID(c *fiber.Ctx, cookieName string, secure bool, sessionDuration time.Duration) (sessionID string, isNew bool, err error) {
+func GetOrCreateSessionID(c *fiber.Ctx, cookieName string, secure bool, sameSite string, sessionDuration time.Duration) (sessionID string, isNew bool, err error) {
     cookie := c.Cookies(cookieName)
     if cookie != "" {
         return cookie, false, nil
@@ -87,7 +92,7 @@ func GetOrCreateSessionID(c *fiber.Ctx, cookieName string, secure bool, sessionD
         Value:    sessionID,
         HTTPOnly: true,
         Secure:   secure,
-        SameSite: "Lax",
+        SameSite: sameSite,
         Path:     "/",
         Expires:  time.Now().Add(sessionDuration),
     })
@@ -139,7 +144,7 @@ func rotateSessionID(ctx context.Context, c *fiber.Ctx, config SessionMiddleware
         Value:    newSessionID,
         HTTPOnly: true,
         Secure:   config.Secure,
-        SameSite: "Lax",
+        SameSite: config.SameSite,
         Path:     "/",
         Expires:  time.Now().Add(config.SessionDuration),
     })
